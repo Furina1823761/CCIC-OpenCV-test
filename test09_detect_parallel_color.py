@@ -138,32 +138,51 @@ def main():
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 2560)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1440)
-    color = white
-    if (color == red or color == black):
-        (lowerLimit1, upperLimit1), (lowerLimit2, upperLimit2) = get_balck_or_red_limits(color)
-    else:
-        lowLimit, highLimit = get_limits(color)
+
+    # ===== 新增：颜色列表 =====
+    colors = [red, blue, yellow, black, white]
+
+    # ===== 新增：提前计算所有颜色的阈值 =====
+    limits_dict = {}
+    for c in colors:
+        if (c == red or c == black):
+            limits_dict[tuple(c)] = get_balck_or_red_limits(c)
+        else:
+            limits_dict[tuple(c)] = get_limits(c)
 
     while True:
         ret, frame = cap.read()
         hsvImg = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        if (color == red or color == black):
-            mask1 = cv2.inRange(hsvImg, lowerLimit1, upperLimit1)
-            mask2 = cv2.inRange(hsvImg, lowerLimit2, upperLimit2)
-            mask = cv2.bitwise_or(mask1, mask2)
-        else:
-            mask = cv2.inRange(hsvImg, lowLimit, highLimit)
-        
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        for contour in contours:
-            if cv2.contourArea(contour) < 500:   
-                continue
-            x, y, w, h = cv2.boundingRect(contour)
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
+        # ===== 新增：逐颜色检测 =====
+        for color in colors:
+            key = tuple(color)
+
+            if (color == red or color == black):
+                (lowerLimit1, upperLimit1), (lowerLimit2, upperLimit2) = limits_dict[key]
+
+                mask1 = cv2.inRange(hsvImg, lowerLimit1, upperLimit1)
+                mask2 = cv2.inRange(hsvImg, lowerLimit2, upperLimit2)
+                mask = cv2.bitwise_or(mask1, mask2)
+            else:
+                lowLimit, highLimit = limits_dict[key]
+                mask = cv2.inRange(hsvImg, lowLimit, highLimit)
+
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            for contour in contours:
+                if cv2.contourArea(contour) < 500:
+                    continue
+                x, y, w, h = cv2.boundingRect(contour)
+
+                # 用当前颜色画框
+                cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
 
         cv2.imshow("frame", frame)
-        cv2.imshow("mask", mask)  
+
+        # 可选：只显示最后一个mask（保持你原结构）
+        cv2.imshow("mask", mask)
+
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
